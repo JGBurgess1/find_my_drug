@@ -101,7 +101,7 @@ def _split_into_chunks(items: List, n_chunks: int) -> List[List]:
 def generate_fingerprints(df: pd.DataFrame,
                            smiles_col: str = "SMILES",
                            radius: int = 2,
-                           n_bits: int = 1024,
+                           n_bits: int = 2048,
                            n_workers: Optional[int] = None) -> Tuple[np.ndarray, pd.Index]:
     """
     Generate Morgan fingerprints for every row in df, using:
@@ -271,8 +271,8 @@ class DockingScoreNet(nn.Module):
     BatchNorm + Dropout after every hidden layer for regularisation.
     """
     def __init__(self,
-                 input_dim: int = 1024,
-                 hidden_dims: Tuple[int, ...] = (512, 256, 128),
+                 input_dim: int = 2048,
+                 hidden_dims: Tuple[int, ...] = (1024, 512, 256),
                  dropout: float = 0.3):
         super(DockingScoreNet, self).__init__()
         layers: List[nn.Module] = []
@@ -405,8 +405,8 @@ def run_pipeline(df_labelled: pd.DataFrame,
                  df_unknown: Optional[pd.DataFrame] = None,
                  smiles_col: str = "SMILES",
                  zinc_col: str = "zinc_id",
-                 score_col: str = "best_energy_kcal",
-                 n_bits: int = 1024,
+                 score_col: str = "LEScore",
+                 n_bits: int = 2048,
                  radius: int = 2,
                  val_split: float = 0.1,
                  test_split: float = 0.1,
@@ -414,7 +414,7 @@ def run_pipeline(df_labelled: pd.DataFrame,
                  n_epochs: int = 50,
                  lr: float = 1e-3,
                  dropout: float = 0.3,
-                 hidden_dims: Tuple[int, ...] = (512, 256, 128),
+                 hidden_dims: Tuple[int, ...] = (1024, 512, 256),
                  model_path: str = "model_1_20April2026.pt",
                  scaler_path: str = "scaler_01_20April2026.pkl",
                  n_workers: Optional[int] = None,
@@ -535,10 +535,10 @@ def run_pipeline(df_labelled: pd.DataFrame,
 # ──────────────────────────────────────────────
 
 def main() -> None:
-    df_known = pd.read_csv("normalised_scores.csv")
-    df_known = df_known.iloc[:400000, :]
+    df_known = pd.read_csv("LE_Scores.csv")
+    df_known = df_known.iloc[:200000, :]
 
-    df_unknown = pd.read_csv("chembl_36_normalised_scores.csv")
+    df_unknown = pd.read_csv("chembl_36_LE_Scores.csv")
     df_unknown = df_unknown.rename(columns={
         "chembl_id":        "zinc_id",
         "canonical_smiles": "SMILES",
@@ -550,10 +550,10 @@ def main() -> None:
         df_unknown  = df_unknown,
         smiles_col  = "SMILES",
         zinc_col    = "zinc_id",
-        score_col   = "normalised_score",
+        score_col   = "LEScore",
         n_epochs    = 20,
         batch_size  = 32,
-        hidden_dims = (512, 256, 128),
+        hidden_dims = (1024, 512, 256),
         dropout     = 0.3,
         val_split   = 0.1,
         test_split  = 0.1,
