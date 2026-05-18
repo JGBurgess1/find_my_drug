@@ -1,0 +1,41 @@
+Training Data Summary
+============================================================
+
+Dataset
+----------------------------------------
+  Total compounds         : 1,107,686
+
+Docking Scores
+----------------------------------------
+  Min  (best binder)      : -26.8660 kcal/mol
+  Max  (worst binder)     : -3.2270 kcal/mol
+  Mean                    : -12.9925 kcal/mol
+  Std                     : 1.7177
+  Median                  : -12.9262 kcal/mol
+  Top  1% threshold       : -17.5476  (11,077 cpds)
+  Top  5% threshold       : -15.8788  (55,385 cpds)
+  Top 10% threshold       : -15.1544  (110,769 cpds)
+
+Molecular Properties  (sample n=200,000)
+----------------------------------------
+  MW   mean / median      : 387.0 / 390.5 Da
+  LogP mean / median      : 2.27 / 2.26
+  HBD  mean               : 1.55
+  HBA  mean               : 4.79
+  TPSA mean               : 81.6 A^2
+  QED  mean               : 0.664
+
+Lipinski Rule-of-5
+----------------------------------------
+  Fully compliant (0 viol): 96.9%
+  MW > 500                : 0.5%
+  LogP > 5                : 2.6%
+  HBD > 5                 : 0.0%
+  HBA > 10                : 0.1%
+
+Diversity
+----------------------------------------
+  Mean pairwise Tanimoto similarity : 0.1336
+  Mean pairwise Tanimoto distance   : 0.8664
+
+Output directory : ./output/

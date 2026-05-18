@@ -536,7 +536,7 @@ def run_pipeline(df_labelled: pd.DataFrame,
 
 def main() -> None:
     df_known = pd.read_csv("LE_Scores.csv")
-    df_known = df_known.iloc[:200000, :]
+    df_known = df_known.iloc[:100000, :]
 
     df_unknown = pd.read_csv("chembl_36_LE_Scores.csv")
     df_unknown = df_unknown.rename(columns={

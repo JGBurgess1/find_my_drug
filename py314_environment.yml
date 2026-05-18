@@ -1,0 +1,38 @@
+name: docking_ml_py312
+
+channels:
+  - pytorch            # official PyTorch channel
+  - nvidia             # CUDA toolkit
+  - conda-forge
+  - defaults
+
+dependencies: q
+  - python=3.12
+  - numpy
+  - pandas
+  - scipy
+  - rdkit
+  - pytorch::pytorch
+  - pytorch::pytorch-cuda=12.4
+  - pytorch::torchvision
+  - pytorch::torchaudio
+  - cuda-toolkit=12.4
+  - cuda-nvrtc
+  - cuda-libraries
+  - cudnn
+  - scikit-learn
+  - joblib
+  - matplotlib
+  - seaborn
+  - pillow
+  - pyarrow
+  - fastparquet
+  - mpi4py
+  - tqdm
+  - psutil
+  - pip
+  - pip:
+    - meeko
+    - umap-learn
+
+# Want to add openbabel without dependencies check.

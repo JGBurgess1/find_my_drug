@@ -8,7 +8,7 @@ Pipeline per chunk:
   2. Drop nulls and Boron-containing SMILES
   3. Generate Morgan fingerprints  (multiprocessing, 9 CPUs)
   4. Scale + run inference          (V100)
-  5. Append results to output CSV
+  5. Append results to output_old CSV
   6. Free memory, move to next chunk
 """
 
@@ -33,7 +33,7 @@ import joblib
 # ------------------------------------------------------------------------------
 
 INPUT_DIR   = "../qcrb_docking_data/zinc_big_file"
-OUTPUT_PATH = "./output/predictions.csv"
+OUTPUT_PATH = "output_old/predictions.csv"
 MODEL_PATH  = "trained_models/model_1_20April2026.pt"
 SCALER_PATH = "trained_models/scaler_01_20April2026.pkl"
 FILE_GLOB   = "*.smi"
@@ -309,7 +309,7 @@ def process_file_in_chunks(fpath:          str,
         fps_scaled = scaler.transform(fps)
         scores     = run_inference(model, fps_scaled, device)
 
-        # Append results to output CSV
+        # Append results to output_old CSV
         result_slice = pd.DataFrame({
             ZINC_COL:                  valid_ids,
             SMILES_COL:                chunk.loc[
@@ -363,7 +363,7 @@ if __name__ == "__main__":
 
     if os.path.exists(OUTPUT_PATH):
         os.remove(OUTPUT_PATH)
-        print("Removed previous output file '{}'\n".format(OUTPUT_PATH))
+        print("Removed previous output_old file '{}'\n".format(OUTPUT_PATH))
 
     header_written = False
     total_scored   = 0

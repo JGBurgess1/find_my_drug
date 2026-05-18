@@ -1,0 +1,68 @@
+name: docking_ml
+
+channels:
+  - conda-forge        # primary -- most up-to-date builds
+  - pytorch            # official PyTorch channel
+  - nvidia             # CUDA toolkit
+  - defaults
+
+dependencies:
+
+  # ── Python ──────────────────────────────────────────────────────────────────
+  - python=3.9.7
+
+  # ── Core scientific stack ────────────────────────────────────────────────────
+  - numpy>=1.23,<2.0
+  - pandas>=1.5,<3.0
+  - scipy>=1.9
+
+  # ── RDKit  (always install via conda -- pip builds are unreliable) ───────────
+  - rdkit>=2023.3.3
+
+  # ── PyTorch + CUDA  ──────────────────────────────────────────────────────────
+  # These lines install PyTorch with CUDA 11.8 support for the V100.
+  # If the cluster has a different CUDA driver version, change cu118 below.
+  # To check driver version on the node: nvidia-smi | grep "CUDA Version"
+  #   CUDA 11.x driver  ->  pytorch-cuda=11.8
+  #   CUDA 12.x driver  ->  pytorch-cuda=12.1
+  - pytorch>=2.0,<3.0
+  - torchvision                 # not directly used but often required by torch
+  - pytorch-cuda=11.8           # change to 12.1 if cluster runs CUDA 12
+
+  # ── Machine learning / preprocessing ────────────────────────────────────────
+  - scikit-learn>=1.2
+  - joblib>=1.2
+
+  # ── Cheminformatics ──────────────────────────────────────────────────────────
+  - openbabel>=3.1               # fallback PDBQT writer in prepare_pdbqt.py
+
+  # ── Plotting ─────────────────────────────────────────────────────────────────
+  - matplotlib>=3.7
+  - seaborn>=0.12
+  - pillow>=9.0                  # required by RDKit Draw (structure grids)
+
+  # ── Data formats ─────────────────────────────────────────────────────────────
+  - pyarrow>=12.0                # Parquet read/write (predict_batch.py)
+  - fastparquet                  # alternative Parquet engine
+
+  # ── Parallel / MPI ───────────────────────────────────────────────────────────
+  # mpi4py must be built against the cluster's MPI implementation.
+  # Install via conda here for a generic build; if the cluster provides
+  # a module (e.g. OpenMPI or IntelMPI), see the note at the bottom.
+  - mpi4py>=3.1
+
+  # ── Utilities ────────────────────────────────────────────────────────────────
+  - tqdm>=4.65                   # progress bars (optional but useful)
+  - psutil>=5.9                  # memory monitoring
+
+  # ── pip-only packages (no conda build available) ─────────────────────────────
+  - pip
+  - pip:
+      # PDBQT writing for AutoDock Vina prep
+      - meeko>=0.4
+
+      # UMAP dimensionality reduction (analyse_training_data.py)
+      - umap-learn>=0.5
+
+      # Molecular balance / bin-packing (balance_jobs.py uses only stdlib
+      # heapq, so no extra dep needed there)
