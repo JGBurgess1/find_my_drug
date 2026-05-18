@@ -27,6 +27,7 @@ import sys
 import glob
 import json
 import math
+import time
 import argparse
 import multiprocessing
 from typing import List, Optional, Tuple
@@ -420,8 +421,11 @@ def merge_node_outputs(output_paths: List[str],
 # Main
 # ------------------------------------------------------------------------------
 
-def main(args: argparse.Namespace) -> None:
+def main(args: argparse.Namespace) -> bool:
+    """Returns True if stopped early due to --max-runtime, False if fully complete."""
     multiprocessing.freeze_support()
+    run_start       = time.time()
+    max_runtime_sec = args.max_runtime * 3600 if args.max_runtime else None
 
     # Resolve output path and matching checkpoint file
     # Each node uses its own output + checkpoint so they never collide
@@ -490,8 +494,9 @@ def main(args: argparse.Namespace) -> None:
         and os.path.getsize(output_path) > 0
     )
 
-    total_scored  = prev_scored
-    total_skipped = 0
+    total_scored     = prev_scored
+    total_skipped    = 0
+    stopped_early    = False
 
     for file_idx, fpath in enumerate(all_files, start=0):
 
@@ -502,6 +507,13 @@ def main(args: argparse.Namespace) -> None:
         # Stop after our end
         if end_idx is not None and file_idx > end_idx:
             print("Reached --end-idx {}  -- stopping.".format(end_idx))
+            break
+
+        # Stop gracefully at a file boundary if approaching walltime
+        if max_runtime_sec and (time.time() - run_start) >= max_runtime_sec:
+            print("Approaching walltime limit -- stopping at file boundary.")
+            print("Checkpoint saved. Resubmit to continue from here.")
+            stopped_early = True
             break
 
         fname   = os.path.basename(fpath)
@@ -526,12 +538,14 @@ def main(args: argparse.Namespace) -> None:
         if skipped:
             total_skipped += 1
 
-    # Mark completion in checkpoint
-    save_checkpoint(checkpoint_file,
-                    effective_end + 1, "COMPLETE", total_scored)
-
     print("=" * 55)
-    print("Run complete.")
+    if stopped_early:
+        print("Stopped early (walltime limit).")
+    else:
+        # Mark completion in checkpoint
+        save_checkpoint(checkpoint_file,
+                        effective_end + 1, "COMPLETE", total_scored)
+        print("Run complete.")
     print("  File range       : {:,} -- {:,}".format(start_idx, effective_end))
     print("  Files processed  : {:,}".format(
         effective_end - start_idx + 1 - total_skipped))
@@ -539,6 +553,8 @@ def main(args: argparse.Namespace) -> None:
     print("  Total scored     : {:,}".format(total_scored))
     print("  Output           : {}".format(output_path))
     print("  Checkpoint       : {}".format(checkpoint_file))
+
+    return stopped_early
     if end_idx is not None:
         print()
         print("When all nodes are done, merge outputs with:")
@@ -590,6 +606,12 @@ Examples:
         help="Output CSV path (default: {})".format(OUTPUT_PATH))
 
     parser.add_argument(
+        "--max-runtime", type=float, default=None, metavar="HOURS",
+        help="Stop gracefully at a file boundary after this many hours. "
+             "Exit code 1 means stopped early; 0 means fully complete. "
+             "Use in PBS scripts to trigger automatic resubmission.")
+
+    parser.add_argument(
         "--restart", action="store_true",
         help="Clear checkpoint and output file, start from scratch")
 
@@ -612,4 +634,5 @@ Examples:
         merge_node_outputs(args.merge, args.output)
         sys.exit(0)
 
-    main(args)
+    stopped_early = main(args)
+    sys.exit(1 if stopped_early else 0)
