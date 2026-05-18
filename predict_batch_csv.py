@@ -1,5 +1,5 @@
 """
-Docking Score Predictor -- Inference Only (CSV output_old, resumable)
+Docking Score Predictor -- Inference Only (CSV output, resumable)
 =================================================================
 Built for: 1x V100 GPU + 9 CPUs on CHPC
 
@@ -13,13 +13,13 @@ Single node (automatic resume):
 
 Split across two GPU nodes (run simultaneously on separate nodes):
     # Node 1
-    python predict_batch_csv.py --start-idx 0    --end-idx 957  --output_old predictions_node1.csv
+    python predict_batch_csv.py --start-idx 0    --end-idx 957  --output predictions_node1.csv
     # Node 2
-    python predict_batch_csv.py --start-idx 958  --end-idx 1915 --output_old predictions_node2.csv
+    python predict_batch_csv.py --start-idx 958  --end-idx 1915 --output predictions_node2.csv
 
 Other options:
     python predict_batch_csv.py --status     # print checkpoint position and exit
-    python predict_batch_csv.py --restart    # clear checkpoint and output_old, start fresh
+    python predict_batch_csv.py --restart    # clear checkpoint and output, start fresh
 """
 
 import os
@@ -45,12 +45,12 @@ import joblib
 # Configuration
 # ------------------------------------------------------------------------------
 
-INPUT_DIR        = "/path/to/zinc_batches/"
-OUTPUT_PATH      = "/scratch/your-user/predictions.csv"
-CHECKPOINT_FILE  = "/scratch/your-user/predictions_checkpoint.json"
-MODEL_PATH       = "best_model.pt"
-SCALER_PATH      = "scaler.pkl"
-FILE_GLOB        = "*.smi"
+CHECKPOINT_FILE  = "./output/predictions_checkpoint.json"
+INPUT_DIR   = "/home/jburgess1/lustre/qcrb_docking_data/zinc20"
+OUTPUT_PATH = "./output/predictions.csv"
+MODEL_PATH  = "trained_models/model_18May_2026.pt"
+SCALER_PATH = "trained_models/scaler_18May_2026.pkl"
+FILE_GLOB   = "*.smi"
 
 ZINC_COL         = "zinc_id"
 SMILES_COL       = "smiles"
@@ -387,13 +387,13 @@ def process_file_in_chunks(fpath:          str,
 def merge_node_outputs(output_paths: List[str],
                        merged_path: str) -> None:
     """
-    Concatenate CSV files from multiple nodes into one sorted output_old.
+    Concatenate CSV files from multiple nodes into one sorted output.
     Call manually after all nodes have finished.
 
     Example:
         python predict_batch_csv.py --merge \\
             predictions_node1.csv predictions_node2.csv \\
-            --output_old predictions_combined.csv
+            --output predictions_combined.csv
     """
     print("Merging {:,} files ...".format(len(output_paths)))
     frames = []
@@ -407,7 +407,7 @@ def merge_node_outputs(output_paths: List[str],
         "predicted_docking_score").reset_index(drop=True)
     combined.to_csv(merged_path, index=False)
 
-    print("\nMerged output_old   : {}".format(merged_path))
+    print("\nMerged output   : {}".format(merged_path))
     print("Total rows      : {:,}".format(len(combined)))
     print("Best score      : {:.4f}".format(
         combined["predicted_docking_score"].iloc[0]))
@@ -420,8 +420,8 @@ def merge_node_outputs(output_paths: List[str],
 def main(args: argparse.Namespace) -> None:
     multiprocessing.freeze_support()
 
-    # Resolve output_old path and matching checkpoint file
-    # Each node uses its own output_old + checkpoint so they never collide
+    # Resolve output path and matching checkpoint file
+    # Each node uses its own output + checkpoint so they never collide
     output_path     = args.output
     checkpoint_file = output_path.replace(".csv", "_checkpoint.json")
 
@@ -435,7 +435,7 @@ def main(args: argparse.Namespace) -> None:
 
     # Handle --restart
     if args.restart:
-        print("--restart: clearing checkpoint and output_old file ...")
+        print("--restart: clearing checkpoint and output file ...")
         clear_checkpoint(checkpoint_file)
         if os.path.exists(output_path):
             os.remove(output_path)
@@ -479,7 +479,7 @@ def main(args: argparse.Namespace) -> None:
     print("Processing files {:,} to {:,}  (of {:,} total)\n".format(
         start_idx, effective_end, n_files))
 
-    # Header already written if resuming into an existing output_old file
+    # Header already written if resuming into an existing output file
     header_written = (
         start_idx > 0
         and args.start_idx is None          # only when using checkpoint resume
@@ -541,7 +541,7 @@ def main(args: argparse.Namespace) -> None:
         print("When all nodes are done, merge outputs with:")
         print("  python predict_batch_csv.py --merge "
               "predictions_node1.csv predictions_node2.csv "
-              "--output_old predictions_combined.csv")
+              "--output predictions_combined.csv")
 
 
 # ------------------------------------------------------------------------------
@@ -550,7 +550,7 @@ def main(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Resumable docking score batch inference (CSV output_old)",
+        description="Resumable docking score batch inference (CSV output)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -558,12 +558,12 @@ Examples:
   python predict_batch_csv.py
 
   # Two nodes splitting 1916 files
-  python predict_batch_csv.py --start-idx 0    --end-idx 957  --output_old predictions_node1.csv
-  python predict_batch_csv.py --start-idx 958  --end-idx 1915 --output_old predictions_node2.csv
+  python predict_batch_csv.py --start-idx 0    --end-idx 957  --output predictions_node1.csv
+  python predict_batch_csv.py --start-idx 958  --end-idx 1915 --output predictions_node2.csv
 
   # Merge after both nodes finish
   python predict_batch_csv.py --merge predictions_node1.csv predictions_node2.csv \\
-      --output_old predictions_combined.csv
+      --output predictions_combined.csv
 
   # Check progress
   python predict_batch_csv.py --status
@@ -583,12 +583,12 @@ Examples:
              "Use with --start-idx to partition work across nodes.")
 
     parser.add_argument(
-        "--output_old", type=str, default=OUTPUT_PATH,
+        "--output", type=str, default=OUTPUT_PATH,
         help="Output CSV path (default: {})".format(OUTPUT_PATH))
 
     parser.add_argument(
         "--restart", action="store_true",
-        help="Clear checkpoint and output_old file, start from scratch")
+        help="Clear checkpoint and output file, start from scratch")
 
     parser.add_argument(
         "--status", action="store_true",
@@ -596,7 +596,7 @@ Examples:
 
     parser.add_argument(
         "--merge", nargs="+", metavar="FILE",
-        help="Merge these CSV files into --output_old and exit (no inference)")
+        help="Merge these CSV files into --output and exit (no inference)")
 
     args = parser.parse_args()
 
