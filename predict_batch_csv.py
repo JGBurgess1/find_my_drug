@@ -218,11 +218,12 @@ def discover_files(input_dir: str, file_glob: str = "*.smi") -> List[str]:
 # Fingerprint generation
 # ------------------------------------------------------------------------------
 
-def _fp_worker(args: Tuple) -> Tuple[List[np.ndarray], List[str]]:
+def _fp_worker(args: Tuple) -> Tuple[List[np.ndarray], List[str], List[str]]:
     chunk, radius, n_bits = args
     gen  = rdFingerprintGenerator.GetMorganGenerator(radius=radius, fpSize=n_bits)
-    fps: List[np.ndarray] = []
-    ids: List[str]        = []
+    fps:    List[np.ndarray] = []
+    ids:    List[str]        = []
+    smiles: List[str]        = []
     for zinc_id, smi in chunk:
         mol = MolFromSmiles(smi)
         if mol is None:
@@ -230,7 +231,8 @@ def _fp_worker(args: Tuple) -> Tuple[List[np.ndarray], List[str]]:
         fp = gen.GetFingerprintAsNumPy(mol).astype(np.float32)
         fps.append(fp)
         ids.append(str(zinc_id))
-    return fps, ids
+        smiles.append(smi)
+    return fps, ids, smiles
 
 
 def _split_into_chunks(items: List, n_chunks: int) -> List[List]:
@@ -238,7 +240,7 @@ def _split_into_chunks(items: List, n_chunks: int) -> List[List]:
     return [items[i: i + cs] for i in range(0, len(items), cs)]
 
 
-def generate_fingerprints(df: pd.DataFrame) -> Tuple[np.ndarray, List[str]]:
+def generate_fingerprints(df: pd.DataFrame) -> Tuple[np.ndarray, List[str], List[str]]:
     pairs  = list(zip(df[ZINC_COL].tolist(), df[SMILES_COL].tolist()))
     n_proc = min(N_WORKERS, len(pairs))
     if n_proc > 1:
@@ -246,15 +248,18 @@ def generate_fingerprints(df: pd.DataFrame) -> Tuple[np.ndarray, List[str]]:
         pool_args = [(c, RADIUS, N_BITS) for c in chunks]
         with multiprocessing.Pool(processes=n_proc) as pool:
             results = pool.map(_fp_worker, pool_args)
-        flat_fps = [fp for fps, _  in results for fp in fps]
-        flat_ids = [i  for _,  ids in results for i  in ids]
+        flat_fps    = [fp  for fps, _,   _   in results for fp  in fps]
+        flat_ids    = [i   for _,  ids,  _   in results for i   in ids]
+        flat_smiles = [smi for _,  _,    sms in results for smi in sms]
     else:
-        flat_fps, flat_ids = _fp_worker((pairs, RADIUS, N_BITS))
+        flat_fps, flat_ids, flat_smiles = _fp_worker((pairs, RADIUS, N_BITS))
 
     n_invalid = len(pairs) - len(flat_fps)
     if n_invalid:
         print("    {:,} invalid SMILES skipped".format(n_invalid))
-    return np.vstack(flat_fps), flat_ids
+    if not flat_fps:
+        return np.empty((0, N_BITS), dtype=np.float32), [], []
+    return np.vstack(flat_fps), flat_ids, flat_smiles
 
 
 # ------------------------------------------------------------------------------
@@ -344,7 +349,7 @@ def process_file_in_chunks(fpath:          str,
             print("  chunk {:>4}  |  dropped {:,} rows".format(
                 chunk_idx, dropped))
 
-        fps, valid_ids = generate_fingerprints(chunk)
+        fps, valid_ids, valid_smiles = generate_fingerprints(chunk)
         if len(fps) == 0:
             del chunk
             continue
@@ -354,9 +359,7 @@ def process_file_in_chunks(fpath:          str,
 
         result = pd.DataFrame({
             ZINC_COL:                  valid_ids,
-            SMILES_COL:                chunk.loc[
-                                           chunk[ZINC_COL].isin(valid_ids),
-                                           SMILES_COL].values,
+            SMILES_COL:                valid_smiles,
             "predicted_docking_score": scores,
             "source_file":             fname,
         })
