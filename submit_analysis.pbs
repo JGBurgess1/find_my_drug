@@ -1,0 +1,44 @@
+#!/bin/bash
+#PBS -N analysis_top1M
+#PBS -l select=1:ncpus=24:mem=128gb
+#PBS -l walltime=06:00:00
+#PBS -j oe
+#PBS -o analysis_top1M.log
+#PBS -m abe
+#PBS -M jeremygburgess@gmail.com
+
+# ── Notes ──────────────────────────────────────────────────────────────────
+# Wall-time estimate for 1 M compounds, 24 CPUs:
+#   Property calculation  ~20-30 min   (500 K cpds, parallel chunks)
+#   Fingerprint matrix    ~10-15 min   (500 K cpds, parallel)
+#   PCA                   ~5 min
+#   UMAP                  ~15-30 min   (can be skipped with --no-umap)
+#   Scaffold analysis     ~5 min
+#   Diversity             ~5-10 min    (25 K cpds, parallel numpy Tanimoto)
+#   Structure grids       ~2 min
+#   Total (with UMAP)     ~60-90 min   → 6 h walltime gives plenty of headroom
+#
+# Memory: 500 K x 2048-bit fingerprints (float32) ≈ 4 GB; 128 GB is safe.
+# ───────────────────────────────────────────────────────────────────────────
+
+source /home/jburgess1/miniforge3/etc/profile.d/conda.sh
+source /home/jburgess1/miniforge3/etc/profile.d/mamba.sh
+mamba activate docking_ml_py312
+
+cd /home/jburgess1/lustre/qcrb_docking_data/May_Work/find-my-drug
+
+# Input: CSV produced by 01_extract_top_hits.py
+# Output: plots written alongside the input file (or override with --outdir)
+python analyse_training_data_updated.py \
+    --input      top_1M_hits.csv \
+    --outdir     ./analysis_top1M/ \
+    --workers    24 \
+    --score-col  predicted_docking_score \
+    --n-pca      500000 \
+    --n-props    500000 \
+    --n-diversity 25000 \
+    --n-scaffold 100000 \
+    --save-svg
+
+# ── Optional: skip UMAP if time is tight ───────────────────────────────────
+# Add --no-umap to the command above to save ~20 minutes.

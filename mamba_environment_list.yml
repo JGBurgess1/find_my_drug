@@ -1,0 +1,37 @@
+name: docking_ml_py312
+
+channels:
+  - pytorch            # official PyTorch channel
+  - nvidia
+  - conda-forge # CUDA toolkit
+  - defaults
+
+dependencies:
+  - python=3.12
+  - numpy
+  - pandas
+  - scipy
+  - rdkit
+  - pytorch
+  - pytorch-cuda=12.4
+  - torchaudio
+  - cuda-toolkit=12.4
+  - cuda-nvrtc
+  - cuda-libraries
+  - cudnn
+  - torchvision
+  - scikit-learn
+  - joblib
+  - openbabel
+  - matplotlib
+  - seaborn
+  - pillow
+  - pyarrow
+  - fastparquet
+  - mpi4py
+  - tqdm
+  - psutil
+  - pip
+  - pip:
+    - meeko
+    - umap-learn
