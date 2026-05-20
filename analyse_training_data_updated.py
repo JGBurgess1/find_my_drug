@@ -69,19 +69,19 @@ except ImportError:
 # Configuration
 # ------------------------------------------------------------------------------
 
-TRAINING_CSV     = "../qcrb_docking_data/LE_Scores.csv"
-OUTPUT_DIR       = "./output/"
+TRAINING_CSV     = "./Inference_1_Top_1M_Hits/top_1M_hits.csv"
+OUTPUT_DIR       = "./Inference_1_Top_1M_Hits/"
 
-ZINC_COL         = "zinc_name"
-SMILES_COL      = "SMILES"
-SCORE_COL       = "LEScore"
+ZINC_COL         = "zinc_id"
+SMILES_COL      = "smiles"
+SCORE_COL       = "predicted_docking_score"
 
-N_FOR_PCA       = 100000
-N_FOR_PROPS     = 200000
-N_FOR_DIVERSITY = 5000
-N_FOR_SCAFFOLD  = 50000
-N_TOP_STRUCT    = 40
-N_BOTTOM_STRUCT = 40
+N_FOR_PCA       = 500000
+N_FOR_PROPS     = 500000
+N_FOR_DIVERSITY = 50000
+N_FOR_SCAFFOLD  = 100000
+N_TOP_STRUCT    = 50
+N_BOTTOM_STRUCT = 50
 
 RADIUS          = 2
 N_BITS          = 2048
@@ -89,7 +89,7 @@ CHUNK_SIZE      = 50000
 N_WORKERS       = os.cpu_count()
 
 # Save both SVG and PNG
-SAVE_SVG        = True
+SAVE_SVG        = False
 SAVE_PNG        = True
 PNG_DPI         = 300     # publication quality
 
@@ -857,7 +857,7 @@ def write_summary(df: pd.DataFrame,
                   mean_dist: float) -> None:
     scores = df[SCORE_COL]
     lines  = [
-        "Training Data Summary",
+        "Data Summary",
         "=" * 60,
         "",
         "Dataset",
