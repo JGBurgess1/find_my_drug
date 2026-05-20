@@ -1,0 +1,24 @@
+#!/bin/bash
+#PBS -N find_my_drug
+#PBS -l select=1:ncpus=9:ngpus=1:mem=64gb
+#PBS -l walltime=12:00:00
+#PBS -j oe
+#PBS -o find_my_drug.log
+
+# ── Activate environment ───────────────────────────────────────────────────
+source /home/jburgess1/miniforge3/etc/profile.d/conda.sh
+source /home/jburgess1/miniforge3/etc/profile.d/mamba.sh
+mamba activate docking_ml_py312
+
+cd /home/jburgess1/lustre/qcrb_docking_data/May_Work/find-my-drug
+
+# ── Run inference, stopping cleanly 15 minutes before walltime ────────────
+# Exit code 1 = stopped early (more files remain); 0 = fully complete
+python predict_batch_csv.py --max-runtime 11.75
+
+if [ $? -eq 1 ]; then
+    echo "Walltime limit reached -- resubmitting job."
+    qsub /home/jburgess1/lustre/qcrb_docking_data/May_Work/find-my-drug/submit_inference.pbs
+else
+    echo "All files processed. No resubmission needed."
+fi

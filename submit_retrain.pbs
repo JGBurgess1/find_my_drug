@@ -1,0 +1,24 @@
+#!/bin/bash
+#PBS -N retrain_round2
+#PBS -l select=1:ncpus=9:ngpus=1:mem=64gb
+#PBS -l walltime=06:00:00
+#PBS -j oe
+#PBS -o retrain_round2.log
+
+source /home/jburgess1/miniforge3/etc/profile.d/conda.sh
+source /home/jburgess1/miniforge3/etc/profile.d/mamba.sh
+mamba activate docking_ml_py312
+
+cd /home/jburgess1/lustre/qcrb_docking_data/May_Work/find-my-drug
+
+# --original-data  : CSV used to train the first model (zinc_id, SMILES, LEScore)
+# --new-docking    : Vina results CSV from the round-2 docking campaign
+# --smiles-map     : top_1M_hits.csv for ZINC-ID -> SMILES lookup
+python 03_merge_and_retrain.py \
+    --original-data   LE_Scores.csv \
+    --new-docking     docking_results_round2.csv \
+    --smiles-map      top_1M_hits.csv \
+    --orig-smiles-col SMILES \
+    --orig-score-col  LEScore \
+    --epochs          50 \
+    --batch           1024

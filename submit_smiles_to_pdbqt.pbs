@@ -1,0 +1,23 @@
+#!/bin/bash
+#PBS -N smiles_to_pdbqt
+#PBS -l select=1:ncpus=64:mem=128gb
+#PBS -l walltime=24:00:00
+#PBS -j oe
+#PBS -o smiles_to_pdbqt.log
+
+# Note: 1 million 3D conformer embeddings is compute-intensive.
+# With 64 workers this takes roughly 2-8 hours depending on molecule size.
+# Adjust ncpus and walltime to match your cluster's available node sizes.
+
+source /home/jburgess1/miniforge3/etc/profile.d/conda.sh
+source /home/jburgess1/miniforge3/etc/profile.d/mamba.sh
+mamba activate docking_ml_py312
+
+cd /home/jburgess1/lustre/qcrb_docking_data/May_Work/find-my-drug
+
+python 02_smiles_to_pdbqt.py \
+    --input       top_1M_hits.csv \
+    --outdir      Vina_Ona_Repo/top_1M_pdbqt \
+    --workers     64 \
+    --batch-size  5000 \
+    --subdir-size 10000

@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -N extract_top_hits
+#PBS -l select=1:ncpus=4:mem=32gb
+#PBS -l walltime=04:00:00
+#PBS -j oe
+#PBS -o extract_top_hits.log
+
+source /home/jburgess1/miniforge3/etc/profile.d/conda.sh
+source /home/jburgess1/miniforge3/etc/profile.d/mamba.sh
+mamba activate docking_ml_py312
+
+cd /home/jburgess1/lustre/qcrb_docking_data/May_Work/find-my-drug
+
+python 01_extract_top_hits.py \
+    --input  predictions.csv \
+    --output top_1M_hits.csv \
+    --top-n  1000000
