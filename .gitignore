@@ -1,0 +1,4 @@
+# Large derived score tables: over GitHub's 100 MB limit, regenerated from the
+# docking runs. Keep them on disk, out of git.
+LE_Scores.csv
+chembl_36_LE_Scores.csv
