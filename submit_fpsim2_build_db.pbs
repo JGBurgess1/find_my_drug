@@ -1,0 +1,82 @@
+#!/bin/bash
+#PBS -N fpsim2_build_db
+#PBS -l select=10:ncpus=24:mpiprocs=1
+#PBS -l walltime=12:00:00
+#PBS -q normal
+#PBS -P CBBI1154
+#PBS -j oe
+#PBS -o fpsim2_build_db.log
+#PBS -m abe
+#PBS -M jeremygburgess@gmail.com
+
+# ── Notes ──────────────────────────────────────────────────────────────────
+# Builds a sharded FPSim2 Morgan r3/2048 database from the ZINC20 tree.
+#
+# Why one rank per node (mpiprocs=1, ncpus=24):
+#   Each MPI rank builds one independent shard, and inside a rank the
+#   fpsim2-create-db CLI fingerprints with --processes workers. So
+#   10 nodes x 24 processes = 240 cores fingerprinting, but only 10 shards
+#   to search later. Using mpiprocs=24 instead would give 240 shards, each
+#   tiny, and 240 engine loads per query at search time.
+#   If you prefer rank-per-core, set mpiprocs=24 and drop --processes.
+#
+# Shard sizing (this drives the search step more than the build):
+#   A 2048-bit fingerprint plus its id is ~264 bytes on disk.
+#     100 M compounds  ->  ~26 GB total  ->  ~2.6 GB per shard over 10 shards
+#     500 M compounds  -> ~132 GB total  ->   ~13 GB per shard
+#   Keep a shard comfortably under one node's RAM and the search runs
+#   in-memory, which is several times faster than --on-disk.
+#
+# Walltime:
+#   Morgan r3/2048 runs at roughly 2-5 k molecules/s/core, so 240 cores is
+#   order 10^6 compounds/s in the ideal case. The sqlite normalisation pass
+#   is single-threaded per rank and is often the longer half of the job --
+#   budget generously on a first run, then tighten using the per-phase
+#   timings this script prints.
+#
+# IMPORTANT -- mpi4py must be built against the cluster's MPI:
+#   A pip wheel ships its own MPI stub and will fail under mpiexec. Install
+#   it inside the conda env after loading the openmpi module, with:
+#     module load chpc/openmpi/4.1.1/gcc-7.3.0
+#     pip install --no-binary=mpi4py mpi4py
+#   Verify before a long run:
+#     mpiexec -n 4 python -c "from mpi4py import MPI; \
+#         print(MPI.COMM_WORLD.Get_rank(), MPI.COMM_WORLD.Get_size())"
+#   If MPI is unavailable the scripts fall back to serial rather than
+#   failing, so a silent one-rank build is the symptom to watch for.
+#
+# FPSim2 is not in py314_environment.yml -- install it once:
+#     mamba install -c conda-forge fpsim2
+# ───────────────────────────────────────────────────────────────────────────
+
+module load chpc/openmpi/4.1.1/gcc-7.3.0
+
+source /home/jburgess1/miniforge3/etc/profile.d/conda.sh
+source /home/jburgess1/miniforge3/etc/profile.d/mamba.sh
+mamba activate docking_ml_py312
+
+cd /home/jburgess1/lustre/qcrb_docking_data/May_Work/find-my-drug
+
+ZINC20_DIR=/home/jburgess1/lustre/qcrb_docking_data/ZINC20
+OUT=/home/jburgess1/lustre/qcrb_docking_data/fpsim2/zinc20_morgan_r3_2048
+
+mkdir -p "$(dirname "$OUT")"
+
+# -n must match select= above (one rank per node here).
+mpiexec -n 10 python fpsim2_build_db.py \
+    --input     "$ZINC20_DIR" \
+    --out       "$OUT" \
+    --processes 24
+
+# Smoke-test first on two subdirectories, serially, before burning 10 nodes:
+#
+#   python fpsim2_build_db.py \
+#       --input "$ZINC20_DIR" --out /tmp/zinc20_smoke \
+#       --limit-subdirs 2 --processes 24
+#
+# Then search it to confirm the sidecar resolves SMILES:
+#
+#   python fpsim2_similarity_search.py \
+#       --db /tmp/zinc20_smoke.manifest.json \
+#       --query 'O=C(NCc1ccc(N2CCOCC2)c(F)c1)N1CCC(c2cccc3ccccc23)CC1' \
+#       --threshold 0.7 --output /tmp/smoke_hits.csv

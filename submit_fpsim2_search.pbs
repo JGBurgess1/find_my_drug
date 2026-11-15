@@ -1,0 +1,74 @@
+#!/bin/bash
+#PBS -N fpsim2_search
+#PBS -l select=10:ncpus=24:mpiprocs=1:mem=120gb
+#PBS -l walltime=04:00:00
+#PBS -q normal
+#PBS -P CBBI1154
+#PBS -j oe
+#PBS -o fpsim2_search.log
+#PBS -m abe
+#PBS -M jeremygburgess@gmail.com
+
+# ── Notes ──────────────────────────────────────────────────────────────────
+# Tanimoto similarity search over the sharded database built by
+# submit_fpsim2_build_db.pbs.
+#
+# Rank count: use one rank per shard, so every shard is loaded exactly once
+#   and searched in parallel. More ranks than shards leaves ranks idle; fewer
+#   means some ranks search several shards one after another (correct, just
+#   slower). The manifest's "shards" array is the number to match.
+#
+# Memory: each rank loads one shard's fingerprints into RAM, so request at
+#   least shard_size + headroom per node. If a shard does not fit, add
+#   --on-disk, which streams instead -- correct but several times slower.
+#   Build more, smaller shards instead where you can.
+#
+# Threshold: FPSim2 prunes candidates using popcount bounds derived from the
+#   threshold, so 0.7 is dramatically cheaper than 0.6, and 0.3 over ZINC20
+#   may not finish inside any sane walltime while returning a result set too
+#   large to write. Start high, then lower it.
+#
+# --n-workers threads a single query inside a rank. With mpiprocs=1 and
+#   ncpus=24 there are cores to spare, so it is worth raising for a small
+#   number of queries; with many queries the shard-level parallelism already
+#   keeps every rank busy.
+#
+# Results are gathered to rank 0, which dedupes by zinc_id across shards and
+# writes one CSV. A very low threshold can make that gather large -- use
+# --top-n to bound it.
+# ───────────────────────────────────────────────────────────────────────────
+
+module load chpc/openmpi/4.1.1/gcc-7.3.0
+
+source /home/jburgess1/miniforge3/etc/profile.d/conda.sh
+source /home/jburgess1/miniforge3/etc/profile.d/mamba.sh
+mamba activate docking_ml_py312
+
+cd /home/jburgess1/lustre/qcrb_docking_data/May_Work/find-my-drug
+
+DB=/home/jburgess1/lustre/qcrb_docking_data/fpsim2/zinc20_morgan_r3_2048.manifest.json
+QUERIES=qcrb_actives.smi          # '<SMILES> <name>' per line
+OUT=fpsim2_hits_t07.csv
+
+# -n should match the shard count in the manifest.
+mpiexec -n 10 python fpsim2_similarity_search.py \
+    --db         "$DB" \
+    --query-file "$QUERIES" \
+    --threshold  0.7 \
+    --metric     tanimoto \
+    --n-workers  4 \
+    --output     "$OUT"
+
+# Single query, no MPI, straight from the login node (fine at a high
+# threshold if a shard fits in memory):
+#
+#   python fpsim2_similarity_search.py \
+#       --db "$DB" \
+#       --query 'O=C(NCc1ccc(N2CCOCC2)c(F)c1)N1CCC(c2cccc3ccccc23)CC1' \
+#       --threshold 0.8 --output hits.csv
+#
+# Feed the hits into the existing docking pipeline:
+#
+#   python 02_smiles_to_pdbqt.py --input "$OUT" \
+#       --zinc-col zinc_id --smiles-col smiles \
+#       --outdir Vina_Ona_Repo/similarity_hits_pdbqt
